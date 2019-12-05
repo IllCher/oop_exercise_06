@@ -87,6 +87,9 @@
 		<Unit filename="/mnt/c/Users/Ilya/Desktop/Labs2course/oop_exercise_06/main.cpp">
 			<Option target="oop_exercise_06"/>
 		</Unit>
+		<Unit filename="/mnt/c/Users/Ilya/Desktop/Labs2course/oop_exercise_06/my_allocator.h">
+			<Option target="oop_exercise_06"/>
+		</Unit>
 		<Unit filename="/mnt/c/Users/Ilya/Desktop/Labs2course/oop_exercise_06/octagon.h">
 			<Option target="oop_exercise_06"/>
 		</Unit>

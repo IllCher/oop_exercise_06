@@ -3,7 +3,7 @@
 #include <memory>
 #include <cstdint>
 typedef unsigned long long ull;
-template <class T>
+template <class T, class Allocator = std::allocator<T>>
 class queue {
 private:
     class iterator;
