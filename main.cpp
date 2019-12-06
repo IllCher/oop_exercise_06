@@ -12,7 +12,7 @@ void add(containers::queue<TOctagon<int>>& q) {
     if (q.size() == 0 && id == 0) {
         std::cin >> a >> b >> c >> d >> e >> f >> g >> h;
         TOctagon<int> oct = TOctagon<int>(a,b,c,d,e,f,g,h);
-        q.it_insert(q.begin(), oct);
+        //q.it_insert(q.begin(), oct);
         return;
     }
     if (id >= q.size()) {
@@ -23,7 +23,7 @@ void add(containers::queue<TOctagon<int>>& q) {
         TOctagon<int> oct = TOctagon<int>(a,b,c,d,e,f,g,h);
         auto it = q.begin();
         std::next(it, id);
-        q.it_insert(it, oct);
+        //q.it_insert(it, oct);
     }
 }
 void rmv(containers::queue<TOctagon<int>>& q) {
@@ -34,7 +34,7 @@ void rmv(containers::queue<TOctagon<int>>& q) {
     } else {
         auto it = q.begin();
         std::next(it, id);
-        q.it_rmv(it);
+        //q.it_rmv(it);
     }
 }
 void prt(containers::queue<TOctagon<int>>& q) {
