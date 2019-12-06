@@ -33,6 +33,8 @@ memory
 -
 cstdint
 -
+iterator
+-
 
 /mnt/d/Study/Labs2course/oop_exercise_06/vertex.h
 iostream

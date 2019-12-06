@@ -5,7 +5,7 @@
 #include <string>
 #include <utility>
 #include <algorithm>
-void add(queue<TOctagon<int>>& q) {
+void add(containers::queue<TOctagon<int>>& q) {
     int id;
     std::cin >> id;
     std::pair<int,int> a,b,c,d,e,f,g,h;
@@ -26,7 +26,7 @@ void add(queue<TOctagon<int>>& q) {
         q.it_insert(it, oct);
     }
 }
-void rmv(queue<TOctagon<int>>& q) {   
+void rmv(containers::queue<TOctagon<int>>& q) {
     int id;
     std::cin >> id;
     if (id >= q.size()) {
@@ -37,7 +37,7 @@ void rmv(queue<TOctagon<int>>& q) {
         q.it_rmv(it);
     }
 }
-void prt(queue<TOctagon<int>>& q) {
+void prt(containers::queue<TOctagon<int>>& q) {
     if (q.size() == 0) {
         std::cout << "empty" << "\n";
         return;
@@ -50,14 +50,14 @@ void prt(queue<TOctagon<int>>& q) {
                 std::cout << "\n";
             });
 }
-void check(queue<TOctagon<int> >& q) {
+void check(containers::queue<TOctagon<int> >& q) {
     double area;
     std::cin >> area;
     int res = std::count_if(q.begin(), q.end(),[area](const TOctagon<int>& oct) -> bool {return oct.area() < area;} );
     std::cout << res << "\n";
 }
 int main() {
-    queue<TOctagon<int>> q;
+    containers::queue<TOctagon<int>> q;
     std::string cmd;
     while (std::cin >> cmd) {
         try {
