@@ -16,12 +16,12 @@ public:
     queue(const queue& q) = delete;
     queue& operator = (const queue&) = delete;
     void push(const T& value) {
-        head_ = push_impl(head_, value);
+        head_ = push_impl(std::move(head_), value);
         size_++;
     }
     std::unique_ptr<lst_node> push_impl(std::unique_ptr<lst_node> tmp, const T& value) {
         if (tmp != nullptr) {
-            tmp->next = push_impl(tmp->next, value);
+            tmp->next = push_impl(std::move(tmp->next), value);
             return tmp;
         }
         return new_node(value);
@@ -30,7 +30,7 @@ public:
     void pop() {
         if (empty())
             throw std::logic_error("empty");
-        head_ = head_->next;
+        head_ = std::move(head_->next);
         size_--;
     }
 
@@ -50,7 +50,7 @@ public:
     }
 
     iterator begin() {
-        return iterator(head_, this);
+        return iterator(head_.get(), this);
     }
 
     iterator end() {
@@ -64,21 +64,20 @@ public:
         }
         std::unique_ptr<lst_node> new_elem = new_node(value);
         if (it == begin()) {
-            new_elem->next = head_;
-            head_ = new_elem;
+            new_elem->next = std::move(head_);
+            head_ = std::move(new_elem);
             size_++;
             return ;
         }
         iterator i = begin();
-        while(i.item_ != nullptr && i.item_->next != it) {
+        while(i.item_ != nullptr && i.item_->next_() != it) {
             ++i;
         }
-        new_elem->next = i.item_->next;
-        i.item_->next = new_elem;
+        new_elem->next = std::move(i.item_->next);
+        i.item_->next = std::move(new_elem);
         size_++;
     }
     void it_rmv(iterator it) {
-        std::unique_ptr<lst_node> tmp = it.item_;
         if (it == end()) {
             throw std::logic_error("can't remove end iterator");
         }
@@ -87,10 +86,10 @@ public:
             return ;
         }
         iterator i = begin();
-        while(i.item_ != nullptr && i.item_->next != it) {
+        while(i.item_ != nullptr && i.item_->next_() != it) {
             ++i;
         }
-        i.item_->next = it.item_->next;
+        i.item_->next = std::move(it.item_->next);
         size_--;
     }
 
@@ -99,6 +98,7 @@ private:
         lst_node() = default;
         std::unique_ptr<lst_node> next;
         value_type value;
+        iterator next_();
 
         lst_node(const value_type& val):
                 value(val), next(nullptr)
@@ -117,10 +117,10 @@ private:
         {}
 
 
-        iterator(const iterator& it) {
+        /*iterator(const iterator& it) {
             item_ = it.item_;
             lst_ = it.lst_;
-        }
+        }*/
 
         ~iterator() = default;
 
@@ -130,16 +130,9 @@ private:
         }
 
         iterator& operator++ () {
-            std::unique_ptr<lst_node> tmp = item_;
-            if (tmp) {
-                if (tmp->next == nullptr) {
-                    throw std::logic_error("out of bounds");
-                }
-                tmp = tmp->next;
-                item_ = tmp;
-                return  *this;
-            }
-            throw std::logic_error("smt strange");
+            if (item_ == nullptr) throw std::logic_error ("out of queue borders");
+            *this = item_->next_();
+            return *this;
         }
         iterator operator++ (int) {
             iterator res(*this);
@@ -155,22 +148,28 @@ private:
         }
 
         bool operator!= (const iterator& example) {
-            return !(*this == example);
+            return item_ != example.item_;
         }
 
         bool operator== (const iterator& example) {
             return item_ == example.item_;
         }
+
     private:
         lst_node* item_;
         queue const *lst_;
-        friend class queue;
+        friend queue;
+        friend lst_node;
     };
     std::unique_ptr<lst_node> head_;
     ull size_ = 0;
     std::unique_ptr<lst_node> new_node(const value_type& value) {
         return std::make_unique<lst_node>(value);
     }
+    iterator next_() {
+        return iterator(this->next.get());
+    }
 };
+
 
 #endif
