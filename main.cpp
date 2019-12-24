@@ -2,6 +2,7 @@
 #include "queue.h"
 #include "octagon.h"
 #include "vertex.h"
+#include "my_allocator.h"
 #include <string>
 #include <utility>
 #include <algorithm>
@@ -12,18 +13,18 @@ void add(containers::queue<TOctagon<int>>& q) {
     if (q.size() == 0 && id == 0) {
         std::cin >> a >> b >> c >> d >> e >> f >> g >> h;
         TOctagon<int> oct = TOctagon<int>(a,b,c,d,e,f,g,h);
-        //q.it_insert(q.begin(), oct);
+        q.push(oct);
         return;
     }
-    if (id >= q.size()) {
+    if (id > q.size()) {
         std::cout << "no such a figure\n";
         return;
     } else {
         std::cin >> a >> b >> c >> d >> e >> f >> g >> h;
         TOctagon<int> oct = TOctagon<int>(a,b,c,d,e,f,g,h);
         auto it = q.begin();
-        std::next(it, id);
-        //q.it_insert(it, oct);
+        std::advance(it, id);
+        q.it_insert(it, oct);
     }
 }
 void rmv(containers::queue<TOctagon<int>>& q) {
@@ -33,8 +34,8 @@ void rmv(containers::queue<TOctagon<int>>& q) {
         std::cout << "no such a figure\n";
     } else {
         auto it = q.begin();
-        std::next(it, id);
-        //q.it_rmv(it);
+        std::advance(it, id);
+        q.it_rmv(it);
     }
 }
 void prt(containers::queue<TOctagon<int>>& q) {
@@ -63,8 +64,15 @@ int main() {
         try {
             if (cmd == "add") {
                 add(q);
-            } else if (cmd == "rmv") {
+            } else if (cmd == "rmv"){
                 rmv(q);
+            }else if (cmd == "push") {
+                std::pair<int,int> a,b,c,d,e,f,g,h;
+                std::cin >> a >> b >> c >> d >> e >> f >> g >> h;
+                TOctagon<int> oct = TOctagon<int>(a,b,c,d,e,f,g,h);
+                q.push(oct);
+            } else if (cmd == "pop") {
+                q.pop();
             } else if (cmd == "prt") {
                 prt(q);
             } else if (cmd == "check") {

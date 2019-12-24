@@ -3,53 +3,49 @@
 #include <memory>
 #include <cstdint>
 #include <iterator>
-using ull = unsigned long long;
 namespace containers {
-    //namespace
-    //
+
     template<class T, class Allocator = std::allocator<T>>
     class queue {
     private:
-        struct element;
+        struct lst_node;
         size_t size_= 0;
     public:
         queue() = default;
 
-        class forward_iterator {
+        class iterator {
         public:
             using value_type = T;
             using reference = T&;
             using pointer = T*;
             using difference_type = std::ptrdiff_t;
             using iterator_category = std::forward_iterator_tag;
-            explicit forward_iterator(element* ptr);
+            explicit iterator(lst_node* ptr);
             T& operator*();
-            forward_iterator& operator++();
-            forward_iterator operator++(int);
-            bool operator== (const forward_iterator& other) const;
-            bool operator!= (const forward_iterator& other) const;
+            iterator& operator++();
+            iterator operator++(int);
+            bool operator== (const iterator& other) const;
+            bool operator!= (const iterator& other) const;
         private:
-            element* it_ptr;
+            lst_node* item_;
             friend queue;
         };
 
-        forward_iterator begin();
-        forward_iterator end();
+        iterator begin();
+        iterator end();
         void push(const T& value);
         T& top();
         void pop();
         size_t size();
-        void delete_by_it(forward_iterator d_it);
-        void delete_by_number(size_t N);
-        void insert_by_it(forward_iterator ins_it, T& value);
-        void insert_by_number(size_t N, T& value);
+        void it_rmv(iterator d_it);
+        void it_insert(iterator ins_it, T& value);
     private:
-        using allocator_type = typename Allocator::template rebind<element>::other;
+        using allocator_type = typename Allocator::template rebind<lst_node>::other;
 
         struct deleter {
             deleter(allocator_type* allocator): allocator_(allocator) {}
 
-            void operator() (element* ptr) {
+            void operator() (lst_node* ptr) {
                 if (ptr != nullptr) {
                     std::allocator_traits<allocator_type>::destroy(*allocator_, ptr);
                     allocator_->deallocate(ptr, 1);
@@ -60,30 +56,30 @@ namespace containers {
             allocator_type* allocator_;
         };
 
-        using unique_ptr = std::unique_ptr<element, deleter>;
+        using unique_ptr = std::unique_ptr<lst_node, deleter>;
 
-        struct element {
+        struct lst_node {
             T value;
-            unique_ptr next_element{nullptr, deleter{nullptr}};
-            element(const T& value_): value(value_) {}
-            forward_iterator next();
+            unique_ptr next{nullptr, deleter{nullptr}};
+            lst_node(const T& value_): value(value_) {}
+            iterator next_();
         };
 
         allocator_type allocator_{};
-        unique_ptr first{nullptr, deleter{nullptr}};
-        element* tail = nullptr;
-    };//===============================end-of-class-queue======================================//
+        unique_ptr head_{nullptr, deleter{nullptr}};
+        lst_node* tail_ = nullptr;
+    };
 
     template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::begin() {
-        return forward_iterator(first.get());
+    typename queue<T, Allocator>::iterator queue<T, Allocator>::begin() {
+        return iterator(head_.get());
     }
 
     template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::end() {
-        return forward_iterator(nullptr);
+    typename queue<T, Allocator>::iterator queue<T, Allocator>::end() {
+        return iterator(nullptr);
     }
-//=========================base-methods-of-queue==========================================//
+
     template<class T, class Allocator>
     size_t queue<T, Allocator>::size() {
         return size_;
@@ -91,16 +87,16 @@ namespace containers {
 
     template<class T, class Allocator>
     void queue<T, Allocator>::push(const T &value) {
-        element* result = this->allocator_.allocate(1);
+        lst_node* result = this->allocator_.allocate(1);
         std::allocator_traits<allocator_type>::construct(this->allocator_, result, value);
         if (!size_) {
-            first = unique_ptr(result, deleter{&this->allocator_});
-            tail = first.get();
+            head_ = unique_ptr(result, deleter{&this->allocator_});
+            tail_ = head_.get();
             size_++;
             return;
         }
-        tail->next_element = unique_ptr(result, deleter{&this->allocator_});
-        tail = tail->next_element.get();
+        tail_->next = unique_ptr(result, deleter{&this->allocator_});
+        tail_ = tail_->next.get();
         size_++;
     }
 
@@ -109,116 +105,92 @@ namespace containers {
         if (size_== 0) {
             throw std::logic_error ("can`t pop from empty queue");
         }
-        first = std::move(first->next_element);
+        head_ = std::move(head_->next);
         size_--;
     }
-
     template<class T, class Allocator>
     T& queue<T, Allocator>::top() {
         if (size_== 0) {
-            throw std::logic_error ("queue is empty, lol, it has no top");
+            throw std::logic_error ("empty");
         }
-        return first->value;
+        return head_->value;
     }
-//=================================advanced-methods========================================//
 
     template<class T, class Allocator>
-    void queue<T, Allocator>::delete_by_it(containers::queue<T, Allocator>::forward_iterator d_it) {
-        forward_iterator i = this->begin(), end = this->end();
+    void queue<T, Allocator>::it_rmv(containers::queue<T, Allocator>::iterator d_it) {
+        iterator i = this->begin(), end = this->end();
         if (d_it == end) throw std::logic_error ("out of borders");
         if (d_it == this->begin()) {
             this->pop();
             return;
         }
-        while((i.it_ptr != nullptr) && (i.it_ptr->next() != d_it)) {
+        while((i.item_ != nullptr) && (i.item_->next_() != d_it)) {
             ++i;
         }
-        if (i.it_ptr == nullptr) throw std::logic_error ("out of borders");
-        i.it_ptr->next_element = std::move(d_it.it_ptr->next_element);
+        if (i.item_ == nullptr) throw std::logic_error ("out of borders");
+        i.item_->next = std::move(d_it.item_->next);
         size_--;
     }
 
     template<class T, class Allocator>
-    void queue<T, Allocator>::delete_by_number(size_t N) {
-        N++;
-        forward_iterator it = this->begin();
-        for (size_t i = 1; i <= N; ++i) {
-            if (i == N) break;
-            ++it;
-        }
-        this->delete_by_it(it);
-    }
-
-    template<class T, class Allocator>
-    void queue<T, Allocator>::insert_by_it(containers::queue<T, Allocator>::forward_iterator ins_it, T& value) {
-        auto tmp = std::unique_ptr<element>(new element{value});
-        forward_iterator i = this->begin();
+    void queue<T, Allocator>::it_insert(containers::queue<T, Allocator>::iterator ins_it, T& value) {
+        /*auto tmp = std::unique_ptr<lst_node>(new lst_node{value});
+        iterator i = this->begin();
         if (ins_it == this->begin()) {
-            tmp->next_element = std::move(first);
-            first = std::move(tmp);
+            tmp->next = std::move(head_.get());
+            head_.get() = std::move(tmp);
             size_++;
             return;
         }
-        while((i.it_ptr != nullptr) && (i.it_ptr->next() != ins_it)) {
+        while((i.item_ != nullptr) && (i.item_->next_() != ins_it)) {
             ++i;
         }
-        if (i.it_ptr == nullptr) throw std::logic_error ("out of borders");
-        tmp->next_element = std::move(i.it_ptr->next_element);
-        i.it_ptr->next_element = std::move(tmp);
-        size_++;
+        if (i.item_ == nullptr) throw std::logic_error ("out of borders");
+        tmp->next = std::move(i.item_->next);
+        i.item_->next = std::move(tmp);
+        size_++;*/
+    }
+
+
+    template<class T, class Allocator>
+    typename queue<T, Allocator>::iterator queue<T, Allocator>::lst_node::next_() {
+        return iterator(this->next.get());
     }
 
     template<class T, class Allocator>
-    void queue<T, Allocator>::insert_by_number(size_t N, T& value) {
-        forward_iterator it = this->begin();
-        for (size_t i = 1; i <= N; ++i) {
-            if (i == N) break;
-            ++it;
-        }
-        this->insert_by_it(it, value);
-    }
-//==============================iterator`s-stuff=======================================//
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::element::next() {
-        return forward_iterator(this->next_element.get());
+    queue<T, Allocator>::iterator::iterator(containers::queue<T, Allocator>::lst_node *ptr) {
+        item_ = ptr;
     }
 
     template<class T, class Allocator>
-    queue<T, Allocator>::forward_iterator::forward_iterator(containers::queue<T, Allocator>::element *ptr) {
-        it_ptr = ptr;
+    T& queue<T, Allocator>::iterator::operator*() {
+        return this->item_->value;
     }
 
     template<class T, class Allocator>
-    T& queue<T, Allocator>::forward_iterator::operator*() {
-        return this->it_ptr->value;
-    }
-
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator& queue<T, Allocator>::forward_iterator::operator++() {
-        if (it_ptr == nullptr) throw std::logic_error ("out of queue borders");
-        *this = it_ptr->next();
+    typename queue<T, Allocator>::iterator& queue<T, Allocator>::iterator::operator++() {
+        if (item_ == nullptr) throw std::logic_error ("out of queue borders");
+        *this = item_->next_();
         return *this;
     }
 
     template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::forward_iterator::operator++(int) {
-        forward_iterator old = *this;
+    typename queue<T, Allocator>::iterator queue<T, Allocator>::iterator::operator++(int) {
+        iterator old = *this;
         ++*this;
         return old;
     }
 
     template<class T, class Allocator>
-    bool queue<T, Allocator>::forward_iterator::operator==(const forward_iterator& other) const {
-        return it_ptr == other.it_ptr;
+    bool queue<T, Allocator>::iterator::operator==(const iterator& other) const {
+        return item_ == other.item_;
     }
 
     template<class T, class Allocator>
-    bool queue<T, Allocator>::forward_iterator::operator!=(const forward_iterator& other) const {
-        return it_ptr != other.it_ptr;
+    bool queue<T, Allocator>::iterator::operator!=(const iterator& other) const {
+        return item_ != other.item_;
     }
 
-    //
-    //namespace
 }
 
 

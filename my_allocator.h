@@ -39,7 +39,7 @@ namespace allocators {
         char* pool_begin;
         char* pool_end;
         char* pool_tail;
-        queue<char*> free_blocks;
+        containers::queue<char*> free_blocks;
     };
 
     template<class T, size_t ALLOC_SIZE>
