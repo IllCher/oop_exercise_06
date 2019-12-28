@@ -34,7 +34,7 @@ public:
 
     T* allocate(size_t size) {
         if (size > 1) {
-            throw std::logic_error("Can't allocate this way");
+            throw std::logic_error("no way to allocate");
         }
         if (free_blocks.empty()) {
             throw std::bad_alloc();
