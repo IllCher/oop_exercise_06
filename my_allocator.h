@@ -1,77 +1,60 @@
 #ifndef D_ALLOCATOR_H_
 #define D_ALLOCATOR_H_
 
-#include <cstdlib>
-#include <iostream>
-#include <type_traits>
+#include <memory>
 #include "queue.h"
 
-namespace allocators {
-    template<class T, size_t ALLOC_SIZE>
-    struct my_allocator {
-        using value_type = T;
-        using size_type = std::size_t;
-        using difference_type = std::ptrdiff_t;
-        using is_always_equal = std::false_type;
+template <typename T, size_t ALLOC_SIZE>
+class my_allocator {
+public:
+    using value_type = T;
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
+    using is_always_equal = std::false_type;
 
-        template<class U>
-        struct rebind {
-            using other = my_allocator<U, ALLOC_SIZE>;
-        };
+    my_allocator(const my_allocator&) = delete;
+    my_allocator(my_allocator&&) = delete;
 
-        my_allocator():
-                pool_begin(new char[ALLOC_SIZE]),
-                pool_end(pool_begin + ALLOC_SIZE),
-                pool_tail(pool_begin)
-        {}
-
-        my_allocator(const my_allocator&) = delete;
-        my_allocator(my_allocator&&) = delete;
-
-        ~my_allocator() {
-            delete[] pool_begin;
-        }
-
-        T* allocate(std::size_t n);
-        void deallocate(T* ptr, std::size_t n);
-
-    private:
-        char* pool_begin;
-        char* pool_end;
-        char* pool_tail;
-        queue<char*> free_blocks;
+    template<class U>
+    struct rebind {
+        using other = my_allocator<U, ALLOC_SIZE>;
     };
 
-    template<class T, size_t ALLOC_SIZE>
-    T* my_allocator<T, ALLOC_SIZE>::allocate(std::size_t n) {
-        if (n != 1) {
-            throw std::logic_error("can`t allocate arrays");
+    my_allocator() {
+        size_t object_count = ALLOC_SIZE / sizeof(T);
+        memory = reinterpret_cast<char*>(operator new(sizeof(T) * object_count));
+        for (size_t i = 0; i < object_count; ++i) {
+            free_blocks.push(memory + sizeof(T) * i);
         }
-        if (size_t(pool_end - pool_tail) < sizeof(T)) {
-            if (free_blocks.size()) {
-                auto it = free_blocks.begin();
-                char* ptr = *it;
-                free_blocks.pop();
-                return reinterpret_cast<T*>(ptr);
-            }
-            throw std::bad_alloc();
-        }
-        T* result = reinterpret_cast<T*>(pool_tail);
-        pool_tail += sizeof(T);
-        return result;
     }
 
-    template<class T, size_t ALLOC_SIZE>
-    void my_allocator<T, ALLOC_SIZE>::deallocate(T *ptr, std::size_t n) {
-        if (n != 1) {
-            throw std::logic_error("can`t allocate arrays, thus can`t deallocate them too");
+    ~my_allocator() {
+        operator delete(memory);
+    }
+
+    T* allocate(size_t size) {
+        if (size > 1) {
+            throw std::logic_error("Can't allocate this way");
         }
-        if(ptr == nullptr){
-            return;
+        if (free_blocks.empty()) {
+            throw std::bad_alloc();
+        }
+        T* temp = reinterpret_cast<T*>(free_blocks.top());
+        free_blocks.pop();
+        return temp;
+
+    }
+
+    void deallocate(T* ptr, size_t size) {
+        if (size != 1) {
+            throw std::logic_error("Can't do that");
         }
         free_blocks.push(reinterpret_cast<char*>(ptr));
     }
 
-}
+private:
+    my_container::queue<char*> free_blocks;
+    char* memory;
+};
 
 #endif // D_ALLOCATOR_H_

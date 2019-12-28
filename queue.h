@@ -1,225 +1,216 @@
 #ifndef QUEUE_H
 #define QUEUE_H
 #include <memory>
+#include <exception>
 #include <cstdint>
-#include <iterator>
-using ull = unsigned long long;
-namespace containers {
-    //namespace
-    //
-    template<class T, class Allocator = std::allocator<T>>
+typedef unsigned long long ull;
+namespace my_container {
+    template <typename T, typename my_allocator>
+    class queue;
+    template <typename T>
+    class lst_node;
+    template <typename T, typename my_allocator>
+    class iterator;
+
+    template <typename T>
+    struct lst_node {
+        lst_node() = default;
+        lst_node(T new_value) : value(new_value) {}
+        T value;
+        std::shared_ptr<lst_node> next = nullptr;
+        std::weak_ptr<lst_node> prev;
+    };
+
+    template<typename T, typename my_allocator = std::allocator<T>>
     class queue {
-    private:
-        struct element;
-        size_t size_= 0;
     public:
-        queue() = default;
+        using value_type = T;
+        using size_type = ull;
+        using reference = value_type&;
 
-        class forward_iterator {
-        public:
-            using value_type = T;
-            using reference = T&;
-            using pointer = T*;
-            using difference_type = std::ptrdiff_t;
-            using iterator_category = std::forward_iterator_tag;
-            explicit forward_iterator(element* ptr);
-            T& operator*();
-            forward_iterator& operator++();
-            forward_iterator operator++(int);
-            bool operator== (const forward_iterator& other) const;
-            bool operator!= (const forward_iterator& other) const;
-        private:
-            element* it_ptr;
-            friend queue;
-        };
+        friend iterator<T, my_allocator>;
 
-        forward_iterator begin();
-        forward_iterator end();
-        void push(const T& value);
-        T& top();
-        void pop();
-        size_t size();
-        void delete_by_it(forward_iterator d_it);
-        void delete_by_number(size_t N);
-        void insert_by_it(forward_iterator ins_it, T& value);
-        void insert_by_number(size_t N, T& value);
-    private:
-        using allocator_type = typename Allocator::template rebind<element>::other;
+        using allocator_type = typename my_allocator::template rebind<lst_node<T>>::other;
 
         struct deleter {
-            deleter(allocator_type* allocator): allocator_(allocator) {}
-
-            void operator() (element* ptr) {
+            deleter(allocator_type* allocator) : allocator_(allocator) {}
+            void operator() (lst_node<T>* ptr) {
                 if (ptr != nullptr) {
-                    std::allocator_traits<allocator_type>::destroy(*allocator_, ptr);
+                    std::allocator_traits<allocator_type>::destroy(*allocator_,ptr);
                     allocator_->deallocate(ptr, 1);
                 }
             }
-
         private:
             allocator_type* allocator_;
         };
 
-        using unique_ptr = std::unique_ptr<element, deleter>;
+    public:
+        queue() {
+            lst_node<T>* ptr = allocator_.allocate(1);
+            std::allocator_traits<allocator_type>::construct(allocator_, ptr);
+            std::shared_ptr<lst_node<T>> new_elem(ptr, deleter(&allocator_));
+            tail_ = new_elem;
+            head_ = tail_;
+            size_ = 0;
+        }
 
-        struct element {
-            T value;
-            unique_ptr next_element{nullptr, deleter{nullptr}};
-            element(const T& value_): value(value_) {}
-            forward_iterator next();
-        };
+        queue(const queue& q) = delete;
+        queue& operator = (const queue&) = delete;
+        void pop() {
+            if (empty()) {
+                throw std::out_of_range("empty");
+            }
+            head_ = head_->next;
+            size_--;
+        }
 
-        allocator_type allocator_{};
-        unique_ptr first{nullptr, deleter{nullptr}};
-        element* tail = nullptr;
-    };//===============================end-of-class-queue======================================//
+        reference top() {
+            if (empty()) {
+                throw std::logic_error("empty");
+            }
+            return head_->value;
+        }
 
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::begin() {
-        return forward_iterator(first.get());
-    }
+        size_type size() {
+            return size_;
+        }
 
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::end() {
-        return forward_iterator(nullptr);
-    }
-//=========================base-methods-of-queue==========================================//
-    template<class T, class Allocator>
-    size_t queue<T, Allocator>::size() {
-        return size_;
-    }
+        bool empty() {
+            return head_ == tail_;
+        }
 
-    template<class T, class Allocator>
-    void queue<T, Allocator>::push(const T &value) {
-        element* result = this->allocator_.allocate(1);
-        std::allocator_traits<allocator_type>::construct(this->allocator_, result, value);
-        if (!size_) {
-            first = unique_ptr(result, deleter{&this->allocator_});
-            tail = first.get();
+        iterator<T, my_allocator> begin() {
+            return iterator<T,my_allocator>(head_, this);
+        }
+
+        iterator<T, my_allocator> end() {
+            return iterator<T, my_allocator>(tail_, this);
+        }
+
+        void push(const T &value) {
+            lst_node<T>* ptr = allocator_.allocate(1);
+            std::allocator_traits<allocator_type>::construct(allocator_, ptr, value);
+            std::shared_ptr<lst_node<T>> new_elem(ptr, deleter(&allocator_));
+            if (empty()) {
+                head_ = new_elem;
+                head_->next = tail_;
+                tail_->prev = head_;
+            } else {
+                tail_->prev.lock()->next = new_elem;
+                new_elem->prev = tail_->prev;
+                new_elem->next = tail_;
+                tail_->prev = new_elem;
+            }
             size_++;
-            return;
         }
-        tail->next_element = unique_ptr(result, deleter{&this->allocator_});
-        tail = tail->next_element.get();
-        size_++;
-    }
 
-    template<class T, class Allocator>
-    void queue<T, Allocator>::pop() {
-        if (size_== 0) {
-            throw std::logic_error ("can`t pop from empty queue");
+        void it_rmv(iterator<T, my_allocator> it) {
+            std::shared_ptr<lst_node<T>> tmp = it.item_.lock();
+            if (it == end()) {
+                throw std::logic_error("can't remove end iterator");
+            }
+            if (it == begin()) {
+                pop();
+                return ;
+            }
+            std::shared_ptr<lst_node<T>> next_tmp = tmp->next;
+            std::weak_ptr<lst_node<T>> prev_tmp = tmp->prev;
+            prev_tmp.lock()->next = next_tmp;
+            next_tmp->prev = prev_tmp;
+            size_--;
         }
-        first = std::move(first->next_element);
-        size_--;
-    }
 
-    template<class T, class Allocator>
-    T& queue<T, Allocator>::top() {
-        if (size_== 0) {
-            throw std::logic_error ("queue is empty, lol, it has no top");
-        }
-        return first->value;
-    }
-//=================================advanced-methods========================================//
-
-    template<class T, class Allocator>
-    void queue<T, Allocator>::delete_by_it(containers::queue<T, Allocator>::forward_iterator d_it) {
-        forward_iterator i = this->begin(), end = this->end();
-        if (d_it == end) throw std::logic_error ("out of borders");
-        if (d_it == this->begin()) {
-            this->pop();
-            return;
-        }
-        while((i.it_ptr != nullptr) && (i.it_ptr->next() != d_it)) {
-            ++i;
-        }
-        if (i.it_ptr == nullptr) throw std::logic_error ("out of borders");
-        i.it_ptr->next_element = std::move(d_it.it_ptr->next_element);
-        size_--;
-    }
-
-    template<class T, class Allocator>
-    void queue<T, Allocator>::delete_by_number(size_t N) {
-        N++;
-        forward_iterator it = this->begin();
-        for (size_t i = 1; i <= N; ++i) {
-            if (i == N) break;
-            ++it;
-        }
-        this->delete_by_it(it);
-    }
-
-    template<class T, class Allocator>
-    void queue<T, Allocator>::insert_by_it(containers::queue<T, Allocator>::forward_iterator ins_it, T& value) {
-        auto tmp = std::unique_ptr<element>(new element{value});
-        forward_iterator i = this->begin();
-        if (ins_it == this->begin()) {
-            tmp->next_element = std::move(first);
-            first = std::move(tmp);
+        void it_insert(iterator<T, my_allocator> it, const T& value) {
+            std::shared_ptr <lst_node<T>> it_ptr = it.item_.lock();
+            if (it == end()) {
+                push(value);
+                return;
+            }
+            lst_node<T>* ptr = allocator_.allocate(1);
+            std::allocator_traits<allocator_type>::construct(allocator_, ptr, value);
+            std::shared_ptr<lst_node<T>> new_elem(ptr, deleter(&allocator_));
+            if (it == begin()) {
+                new_elem->next = head_;
+                head_->prev = new_elem;
+                head_ = new_elem;
+                size_++;
+                return ;
+            }
+            std::shared_ptr <lst_node<T>> ptr_next = it_ptr;
+            std::weak_ptr <lst_node<T>> ptr_prev = it_ptr -> prev;
+            new_elem->prev = ptr_prev;
+            ptr_prev.lock()->next = new_elem;
+            new_elem->next = ptr_next;
+            ptr_next->prev = new_elem;
             size_++;
-            return;
+
         }
-        while((i.it_ptr != nullptr) && (i.it_ptr->next() != ins_it)) {
-            ++i;
+
+    private:
+        allocator_type allocator_;
+        std::shared_ptr<lst_node<T>> head_;
+        std::shared_ptr<lst_node<T>> tail_;
+        int size_;
+    };
+
+    template<typename T, typename my_allocator>
+    class iterator {
+        friend queue<T, my_allocator>;
+    public:
+        using value_type = T;
+        using reference = T&;
+        using pointer = T*;
+        using difference_type = ptrdiff_t;
+        using iterator_category = std::forward_iterator_tag;
+
+        iterator(std::shared_ptr<lst_node<T>> init_ptr,const queue<T, my_allocator>* ptr) : item_(init_ptr), lst_(ptr) {}
+
+        iterator(const iterator& it) {
+            item_ = it.item_;
+            lst_ = it.lst_;
         }
-        if (i.it_ptr == nullptr) throw std::logic_error ("out of borders");
-        tmp->next_element = std::move(i.it_ptr->next_element);
-        i.it_ptr->next_element = std::move(tmp);
-        size_++;
-    }
 
-    template<class T, class Allocator>
-    void queue<T, Allocator>::insert_by_number(size_t N, T& value) {
-        forward_iterator it = this->begin();
-        for (size_t i = 1; i <= N; ++i) {
-            if (i == N) break;
-            ++it;
+        iterator& operator= (const iterator& it) {
+            item_ = it.item_;
+            return *this;
         }
-        this->insert_by_it(it, value);
-    }
-//==============================iterator`s-stuff=======================================//
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::element::next() {
-        return forward_iterator(this->next_element.get());
-    }
 
-    template<class T, class Allocator>
-    queue<T, Allocator>::forward_iterator::forward_iterator(containers::queue<T, Allocator>::element *ptr) {
-        it_ptr = ptr;
-    }
+        iterator& operator++ () {
+            std::shared_ptr<lst_node<T>> tmp = item_.lock();
+            if (tmp) {
+                if (tmp->next == nullptr) {
+                    throw std::logic_error("out of bounds");
+                }
+                tmp = tmp->next;
+                item_ = tmp;
+                return  *this;
+            }
+            throw std::logic_error("smt strange");
+        }
+        iterator operator++ (int) {
+            iterator res(*this);
+            ++(*this);
+            return res;
+        }
+        reference operator*() {
+            return item_.lock()->value;
+        }
 
-    template<class T, class Allocator>
-    T& queue<T, Allocator>::forward_iterator::operator*() {
-        return this->it_ptr->value;
-    }
+        pointer operator->() {
+            return &item_->value;
+        }
 
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator& queue<T, Allocator>::forward_iterator::operator++() {
-        if (it_ptr == nullptr) throw std::logic_error ("out of queue borders");
-        *this = it_ptr->next();
-        return *this;
-    }
+        bool operator!= (const iterator& example) {
+            return !(*this == example);
+        }
 
-    template<class T, class Allocator>
-    typename queue<T, Allocator>::forward_iterator queue<T, Allocator>::forward_iterator::operator++(int) {
-        forward_iterator old = *this;
-        ++*this;
-        return old;
-    }
+        bool operator== (const iterator& example) {
+            return item_.lock() == example.item_.lock();
+        }
 
-    template<class T, class Allocator>
-    bool queue<T, Allocator>::forward_iterator::operator==(const forward_iterator& other) const {
-        return it_ptr == other.it_ptr;
-    }
-
-    template<class T, class Allocator>
-    bool queue<T, Allocator>::forward_iterator::operator!=(const forward_iterator& other) const {
-        return it_ptr != other.it_ptr;
-    }
-
-    //
-    //namespace
+    private:
+        std::weak_ptr<lst_node<T>> item_;
+        const queue<T, my_allocator>* lst_;
+    };
 }
-
-
 #endif
