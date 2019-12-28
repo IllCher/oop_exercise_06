@@ -1,3 +1,0 @@
-/cygdrive/c/Users/Ilya/Desktop/Labs2course/oop_exercise_06/cmake-build-debug-cygwin/CMakeFiles/rebuild_cache.dir
-/cygdrive/c/Users/Ilya/Desktop/Labs2course/oop_exercise_06/cmake-build-debug-cygwin/CMakeFiles/oop_exercise_06.dir
-/cygdrive/c/Users/Ilya/Desktop/Labs2course/oop_exercise_06/cmake-build-debug-cygwin/CMakeFiles/edit_cache.dir
